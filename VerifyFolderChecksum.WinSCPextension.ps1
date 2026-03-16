@@ -26,6 +26,12 @@ $filecount = 0
 $matchcount = 0
 $mismatchcount = 0
 
+Function UpdateProgressBar {
+    $pct = (($global:matchcount + $global:mismatchcount) / $global:filecount) * 100
+    if ($pct -gt 100) { $pct = 100 }
+    Write-Progress -Activity "Folder Verification (This is a very rough guess, hence it can take a bit at 100% based on how different the folders are)" -Status "$pct% Complete: $global:matchcount matches, $global:mismatchcount mismatches" -PercentComplete $pct
+}
+
 Function CheckFolder {
     param ($localPath, $remotePath)
     $a = Get-ChildItem -Path $localPath -Force | Sort-Object
@@ -36,43 +42,48 @@ Function CheckFolder {
 
     while ($true) {
         try {
-            Write-Host $a[$li].FullName $c[$ri].FullName
+            # Write-Host $a[$li].FullName $c[$ri].FullName
 
             if ($a[$li].Name -eq $c[$ri].Name) {
                 if ($a[$li].GetType().Name -eq "DirectoryInfo" -and $c[$ri].FileType -eq "D") {
                     CheckFolder $a[$li].FullName $c[$ri].FullName
                 } elseif ($a[$li].GetType().Name -eq "FileInfo" -and $c[$ri].FileType -eq "-") {
-                    $sw = [Diagnostics.Stopwatch]::StartNew()
+                    # $sw = [Diagnostics.Stopwatch]::StartNew()
                     $sha1 = [System.Security.Cryptography.SHA1]::Create()
                     $localStream = [System.IO.File]::OpenRead($a[$li].FullName)
                     $localChecksum = [System.BitConverter]::ToString($sha1.ComputeHash($localStream))
-                    $sw.Stop()
-                    Write-Host -ForegroundColor DarkGray $sw.Elapsed $a[$li].FullName
+                    # $sw.Stop()
+                    # Write-Host -ForegroundColor DarkGray $sw.Elapsed $a[$li].FullName
 
-                    $sw1 = [Diagnostics.Stopwatch]::StartNew()
+                    # $sw1 = [Diagnostics.Stopwatch]::StartNew()
                     $remoteChecksumBytes = $session.CalculateFileChecksum("sha-1", $c[$ri].FullName)
                     $remoteChecksum = [System.BitConverter]::ToString($remoteChecksumBytes)
                     
 
                     if ($remoteChecksum -eq $localChecksum) {
                         $global:matchcount++
+                        UpdateProgressBar
                     } else {
                         $global:mismatchcount++
+                        UpdateProgressBar
                         Write-Host "Checksum doesn't match" $a[$li].FullName $c[$ri].FullName
                     }
 
                 } else {
                     $global:mismatchcount++
+                    UpdateProgressBar
                     Write-Host "One of these is a file and one a folder" $a[$li].FullName $c[$ri].FullName
                 }
                 $li++
                 $ri++
             } elseif ($a[$li].Name -gt $c[$ri].Name) {
                 $global:mismatchcount++
+                UpdateProgressBar
                 Write-Host $c[$ri].FullName "doesn't exist locally 1"
                 $ri++
             } else {
                 $global:mismatchcount++
+                UpdateProgressBar
                 Write-Host $a[$li].FullName "doesn't exist on remote 1"
                 $li++
             }
@@ -80,6 +91,7 @@ Function CheckFolder {
             if ($li -eq $a.Length) {
                 for (; $ri -lt $c.Length; $ri++) {
                     $global:mismatchcount++
+                    UpdateProgressBar
                     Write-Host $c[$ri].FullName "doesn't exist on remote 2"
                 }
                 break
@@ -88,23 +100,20 @@ Function CheckFolder {
             if ($ri -eq $c.Length) {
                 for (; $li -lt $a.Length; $li++) {
                     $global:mismatchcount++
+                    UpdateProgressBar
                     Write-Host $a[$li].FullName "doesn't exist locally 2"
                 }
                 break
             }
-
-            $pct = (($matchcount + $mismatchcount) / $filecount) * 100
-            if ($pct -gt 100) { $pct = 100 }
-            Write-Progress -Activity "Folder Verification (This is a very rough guess, hence it can take a bit at 100% based on how different the folders are)" -Status "$pct% Complete: $matchcount matches, $mismatchcount mismatches" -PercentComplete $pct
-        } catch {
-            Write-Host -ForegroundColor DarkGreen "Error from" $a[$li].FullName
-            Write-Host "Error: $($_.Exception.Message)"
-            $sw1.Stop()
-            Write-Host -ForegroundColor DarkRed $sw1.Elapsed $a[$li - 1].FullName
-            return
+        # } catch {
+            # Write-Host -ForegroundColor DarkGreen "Error from" $a[$li].FullName
+            # Write-Host "Error: $($_.Exception.Message)"
+            # $sw1.Stop()
+            # Write-Host -ForegroundColor DarkRed $sw1.Elapsed $a[$li - 1].FullName
+            # return
         } finally {
-            $sw1.Stop()
-            Write-Host -ForegroundColor DarkRed $sw1.Elapsed $a[$li - 1].FullName
+            # $sw1.Stop()
+            # Write-Host -ForegroundColor DarkRed $sw1.Elapsed $a[$li - 1].FullName
         }
     }
 }
