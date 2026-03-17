@@ -26,6 +26,16 @@ $filecount = 0
 $matchcount = 0
 $mismatchcount = 0
 
+Function Mismatch {
+    param ($text, $localPath, $remotePath)
+    $global:mismatchcount++
+    UpdateProgressBar
+    Write-Host -ForegroundColor DarkRed $text
+    if ($localPath) { Write-Host -ForegroundColor Yellow $localPath }
+    if ($remotePath) { Write-Host -ForegroundColor Green $remotePath }
+    Write-Host
+}
+
 Function UpdateProgressBar {
     $pct = (($global:matchcount + $global:mismatchcount) / $global:filecount) * 100
     if ($pct -gt 100) { $pct = 100 }
@@ -64,56 +74,37 @@ Function CheckFolder {
                         $global:matchcount++
                         UpdateProgressBar
                     } else {
-                        $global:mismatchcount++
-                        UpdateProgressBar
-                        Write-Host "Checksum doesn't match" $a[$li].FullName $c[$ri].FullName
+                        Mismatch "Checksum doesn't match" $a[$li].FullName $c[$ri].FullName
                     }
 
                 } else {
-                    $global:mismatchcount++
-                    UpdateProgressBar
-                    Write-Host "One of these is a file and one a folder" $a[$li].FullName $c[$ri].FullName
+                    Mismatch "One of these is a file and one a folder" $a[$li].FullName $c[$ri].FullName
                 }
                 $li++
                 $ri++
             } elseif ($a[$li].Name -gt $c[$ri].Name) {
-                $global:mismatchcount++
-                UpdateProgressBar
-                Write-Host $c[$ri].FullName "doesn't exist locally 1"
+                Mismatch "File doesn't exist locally" $null $c[$ri].FullName 
                 $ri++
             } else {
-                $global:mismatchcount++
-                UpdateProgressBar
-                Write-Host $a[$li].FullName "doesn't exist on remote 1"
+                Mismatch "File doesn't exist on remote" $a[$li].FullName 
                 $li++
             }
 
             if ($li -eq $a.Length) {
                 for (; $ri -lt $c.Length; $ri++) {
-                    $global:mismatchcount++
-                    UpdateProgressBar
-                    Write-Host $c[$ri].FullName "doesn't exist on remote 2"
+                    Mismatch "File doesn't exist on remote" $null $c[$ri].FullName
                 }
                 break
             }
 
             if ($ri -eq $c.Length) {
                 for (; $li -lt $a.Length; $li++) {
-                    $global:mismatchcount++
-                    UpdateProgressBar
-                    Write-Host $a[$li].FullName "doesn't exist locally 2"
+                    Mismatch "File doesn't exist on remote" $a[$li].FullName
                 }
                 break
             }
-        # } catch {
-            # Write-Host -ForegroundColor DarkGreen "Error from" $a[$li].FullName
-            # Write-Host "Error: $($_.Exception.Message)"
-            # $sw1.Stop()
-            # Write-Host -ForegroundColor DarkRed $sw1.Elapsed $a[$li - 1].FullName
-            # return
-        } finally {
-            # $sw1.Stop()
-            # Write-Host -ForegroundColor DarkRed $sw1.Elapsed $a[$li - 1].FullName
+        } catch {
+            Write-Host -ForegroundColor DarkRed "Error while calculating $($_.Exception.Message)" 
         }
     }
 }
